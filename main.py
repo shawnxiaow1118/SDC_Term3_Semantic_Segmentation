@@ -36,10 +36,10 @@ def load_vgg(sess, vgg_path):
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_tag)
     graph = tf.get_default_graph()
     vinput = graph.get_tensor_by_name(vgg_input_tensor_name)
-    keep = graph.get_tensor_by_name(vgg_input_tensor_name)
+    keep = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
     vlayer_3 = graph.get_tensor_by_name(vgg_layer3_out)
-    vlayer_4 = graph.get_tensor_by_name(vgg_layer3_out)
-    vlayer_7 = graph.get_tensor_by_name(vgg_layer3_out)
+    vlayer_4 = graph.get_tensor_by_name(vgg_layer4_out)
+    vlayer_7 = graph.get_tensor_by_name(vgg_layer7_out)
 
     
     return vinput, keep, vlayer_3, vlayer_4, vlayer_7
@@ -109,21 +109,34 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    log_dir = '/tmp/tf/adl/logs'
+    if tf.gfile.Exists(log_dir):
+        tf.gfile.DeleteRecursively(log_dir)
+    tf.gfile.MakeDirs(log_dir)
+    writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
     merged_summary = tf.summary.merge_all()
-    global_step = tf.Variable(0, trainable=False)
-    starting_learning_rate = 0.05
-    learning_rate = tf.train.exponential_decay(starting_learning_rate, global_step, 1000, 0.96, staircase=True)
-    with sess.as_default():
 
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
-        for i in range(epochs):
-            print('Epoch %d step %d'(i, global_step))
-            for images,labels in get_batches_fn(batch_size):
-                run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                run_metadata = tf.RunMetadata()
-                _, summary = sess.run([train_op, merged_summary],
-                                feed_dict={input_image})
+    sess.run(tf.global_variables_initializer())
+    sess.run(tf.local_variables_initializer())
+    for i in range(epochs):
+        print('Epoch %d step %d'(i, global_step))
+        for images,labels in get_batches_fn(batch_size):
+            if global_step%10 == 0:
+                _, summary, loss = sess.run([train_op, merged_summary, train_op],
+                            feed_dict={input_image: images,
+                            correct_label: labels,
+                            learning_rate: learning_rate,
+                            keep_prob: keep_prob})
+            train_writer.add_summary(summary, step)
+            print('step %d cross_entropy_loss %.03f' % (global_step, loss))
+            else:
+                _ = sess.run(train_op,
+                            feed_dict={input_image: images,
+                            correct_label: labels,
+                            learning_rate: learning_rate,
+                            keep_prob: keep_prob})
+    writer.close()
+
 
 tests.test_train_nn(train_nn)
 
@@ -145,18 +158,29 @@ def run():
     with tf.Session() as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
-        # Create function to get batches
+        # Create function to get 
+        global_step = tf.Variable(0, trainable=False)
+        starting_learning_rate = 0.05
+        learning_rate = tf.train.exponential_decay(starting_learning_rate, global_step, 1000, 0.96, staircase=True)
         get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
 
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
-
+        vinput, keep_prob, vlayer_3, vlayer_4, vlayer_7 = load_vgg(sess, data_dir) 
         # TODO: Train NN using the train_nn function
+        nn_last_layer = layers(vlayer_3, vlayer_4, vlayer_7, num_classes)
+
+        logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
+
+        correct_label = tf.placeholder(tf.float32, (None, image_shape[0], image_shape[1], num_classes), name='correct-label')
+        epochs = 60
+        batch_size = 10
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image)
 
         # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, vinput, correct_label, keep_prob, learning_rate)
 
         # OPTIONAL: Apply the trained model to a video
 
