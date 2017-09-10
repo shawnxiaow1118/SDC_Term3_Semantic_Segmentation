@@ -22,7 +22,8 @@ Run the following command to run the project:
 python main.py
 ```
 **Note** If running this in Jupyter Notebook system messages, such as those regarding test status, may appear in the terminal rather than the notebook.
-
+##### Results
+You can see one of the final result in /runs/1505075508.2251685
 ### Submission
 1. Ensure you've passed all the unit tests.
 2. Ensure you pass all points on [the rubric](https://review.udacity.com/#!/rubrics/989/view).
