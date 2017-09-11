@@ -67,19 +67,23 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     print("upsample1",upsample_1)
     print("vgg_layer_4", vgg_layer4_out)
     vgg_layer4_out_samesize = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, 1, padding="same",
-                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4))
+                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4),
+                    kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     skip_1 = tf.add(upsample_1, vgg_layer4_out_samesize)
 
     upsample_2 = tf.layers.conv2d_transpose(skip_1, num_classes, 4, 2, padding="same",
-                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4))
+                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4),
+                    kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     print("upsample_2", upsample_2)
     vgg_layer3_out_samesize = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, 1, padding="same",
-                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4))
+                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4),
+                    kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
     skip_2 = tf.add(upsample_2, vgg_layer3_out_samesize)
     print("skip2", skip_2)
     upsample_3 = tf.layers.conv2d_transpose(skip_2, num_classes, 16, 8, padding="same",
-                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4))
+                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-4),
+                    kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     print("upsample3", upsample_3)
 
     return upsample_3
@@ -163,9 +167,9 @@ def run():
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
         # Create function to get 
-        starting_learning_rate = 0.002
+        starting_learning_rate = 0.0005
         global_step = tf.Variable(0, trainable=False)
-        learning_rate = tf.train.exponential_decay(starting_learning_rate, global_step, 400, 0.95, staircase=True)
+        learning_rate = tf.train.exponential_decay(starting_learning_rate, global_step, 800, 0.95, staircase=True)
         get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
 
         # OPTIONAL: Augment Images for better results
@@ -179,8 +183,8 @@ def run():
         correct_label = tf.placeholder(tf.float32, (None, image_shape[0], image_shape[1], num_classes), name='correct_label')
 
         logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
-        epochs = 80
-        batch_size = 10
+        epochs = 30
+        batch_size = 3
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, image_input, correct_label, keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
